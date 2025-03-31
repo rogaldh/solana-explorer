@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Headers } from 'node-fetch';
 
-import { fetchResource, StatusError } from './feature';
+import { fetchResource, isJson, isText, StatusError } from './feature';
 import { errors } from './feature/errors';
 import { checkURLForPrivateIP, isHTTPProtocol } from './feature/ip';
 
@@ -10,10 +10,12 @@ type Params = { params: object }
 const USER_AGENT = process.env.NEXT_PUBLIC_METADATA_USER_AGENT ?? 'Solana Explorer';
 const MAX_SIZE = process.env.NEXT_PUBLIC_METADATA_MAX_CONTENT_SIZE
     ? Number(process.env.NEXT_PUBLIC_METADATA_MAX_CONTENT_SIZE)
-    : 1_000_000; // 1 000 000 bytes
+    : 10_000_000; // Increased to 10MB to handle larger responses
 const TIMEOUT = process.env.NEXT_PUBLIC_METADATA_TIMEOUT
     ? Number(process.env.NEXT_PUBLIC_METADATA_TIMEOUT)
     : 10_000; // 10s
+
+console.log('Metadata proxy configuration:', { MAX_SIZE, TIMEOUT, USER_AGENT });
 
 /**
  *  Respond with error in a JSON format
@@ -72,6 +74,16 @@ export async function GET(
     try {
         const response = await fetchResource(uriParam, headers, TIMEOUT, MAX_SIZE);
 
+        console.log('Response details:', {
+            contentLength: response.headers.get('content-length'),
+            contentType: response.headers.get('content-type'),
+            dataIsArrayBuffer: response.data instanceof ArrayBuffer,
+            dataIsBuffer: Buffer.isBuffer(response.data),
+            dataLength: typeof response.data === 'string' ? response.data.length : 'not string',
+            dataType: typeof response.data,
+            uriParam
+        });
+
         data = response.data;
         resourceHeaders = response.headers;
     } catch (e) {
@@ -108,12 +120,55 @@ export async function GET(
     }
 
     if (data instanceof ArrayBuffer) {
-        return new NextResponse(data, {
+        // Convert ArrayBuffer to Buffer for proper handling
+        const buffer = Buffer.from(data);
+        console.log('Binary response:', {
+            bufferLength: buffer.length,
+            contentType: resourceHeaders.get('content-type')
+        });
+
+        return new NextResponse(buffer, {
             headers: responseHeaders,
         });
-    } else if (resourceHeaders.get('content-type')?.startsWith('application/json')) {
+    } else if (isJson(resourceHeaders)) {
+        // For JSON data, ensure it's properly serialized
+        console.log('JSON response:', {
+            dataLength: typeof data === 'string' ? data.length : JSON.stringify(data).length,
+            dataType: typeof data
+        });
+
+        // If data is already a string and supposed to be JSON, pass it directly
+        if (typeof data === 'string') {
+            return new NextResponse(data, {
+                headers: {
+                    ...responseHeaders,
+                    'Content-Type': 'application/json; charset=utf-8',
+                },
+            });
+        }
+
+        // Otherwise use NextResponse.json which will serialize for us
         return NextResponse.json(data, {
             headers: responseHeaders,
+        });
+    } else if (isText(resourceHeaders)) {
+        // For text responses, ensure proper encoding and content type
+
+        console.log('Text response:', {
+            H: resourceHeaders.get('content-length'),
+            dataLength: data.length,
+            dataType: typeof data
+        });
+        // Calculate byte length correctly for UTF-8 encoding
+        const textBytes = Buffer.from(data, 'utf-8');
+        const byteLength = textBytes.length;
+
+        return new NextResponse(data, {
+            headers: {
+                ...responseHeaders,
+                // return the byte length of the text data
+                'Content-Length': byteLength.toString(),
+            },
         });
     } else {
         return respondWithError(415);
