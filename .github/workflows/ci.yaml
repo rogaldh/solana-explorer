@@ -2,9 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
   pull_request:
-    branches: [master]
 
 jobs:
   Build-And-Test:
@@ -33,10 +31,21 @@ jobs:
         run: pnpm install
 
       - name: Build
-        run: pnpm build
+        env:
+          NEXT_PUBLIC_MAINNET_RPC_URL: ${{ secrets.NEXT_PUBLIC_MAINNET_RPC_URL }}
+          NEXT_PUBLIC_DEVNET_RPC_URL: ${{ secrets.NEXT_PUBLIC_DEVNET_RPC_URL }}
+        run: |
+          echo "$NEXT_PUBLIC_MAINNET_RPC_URL"
+          pnpm build
 
       - name: Code-style
         run: pnpm format:ci
 
       - name: Test
-        run: pnpm test:ci
+        env:
+          NEXT_PUBLIC_MAINNET_RPC_URL: ${{ secrets.NEXT_PUBLIC_MAINNET_RPC_URL }}
+          NEXT_PUBLIC_DEVNET_RPC_URL: ${{ secrets.NEXT_PUBLIC_DEVNET_RPC_URL }}
+        run: |
+          echo "$NEXT_PUBLIC_MAINNET_RPC_URL"
+          echo "$NEXT_PUBLIC_DEVNET_RPC_URL"
+          pnpm test:ci
