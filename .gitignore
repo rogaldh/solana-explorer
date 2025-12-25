@@ -40,3 +40,4 @@ next-env.d.ts
 # vim
 *.sw*
 .editorconfig
+*storybook.log

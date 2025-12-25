@@ -1,4 +1,5 @@
 'use client';
+import './styles.css';
 
 import { AddressLookupTableAccountSection } from '@components/account/address-lookup-table/AddressLookupTableAccountSection';
 import { isAddressLookupTableAccount } from '@components/account/address-lookup-table/types';
@@ -36,6 +37,7 @@ import { CacheEntry, FetchStatus } from '@providers/cache';
 import { useCluster } from '@providers/cluster';
 import { PROGRAM_ID as ACCOUNT_COMPRESSION_ID } from '@solana/spl-account-compression';
 import { PublicKey } from '@solana/web3.js';
+import { TOKEN_2022_PROGRAM_ADDRESS } from '@solana-program/token-2022';
 import { Cluster, ClusterStatus } from '@utils/cluster';
 import { FEATURE_PROGRAM_ID } from '@utils/parseFeatureAccount';
 import { useClusterPath } from '@utils/url';
@@ -406,7 +408,26 @@ function TokenMintHeaderCard({
             {unverified && (
                 <div className="alert alert-warning alert-scam" role="alert">
                     Warning! Token names and logos are not unique. This token may have spoofed its name and logo to look
-                    like another token. Verify the token&apos;s mint address to ensure it is correct.
+                    like another token. Verify the token&apos;s mint address to ensure it is correct. If you are the
+                    token creator, please verify your token on{' '}
+                    <a
+                        href="https://support.coingecko.com/hc/en-us/articles/23725417857817-Verification-Guide-for-Listing-Update-Requests-on-CoinGecko"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: 'white', textDecoration: 'underline' }}
+                    >
+                        Coingecko
+                    </a>{' '}
+                    or on{' '}
+                    <a
+                        href="https://verify.jup.ag/"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: 'white', textDecoration: 'underline' }}
+                    >
+                        Jupiter
+                    </a>
+                    .
                 </div>
             )}
             <div className="col-auto">
@@ -569,7 +590,8 @@ export type MoreTabs =
     | 'compression'
     | 'verified-build'
     | 'program-multisig'
-    | 'feature-gate';
+    | 'feature-gate'
+    | 'token-extensions';
 
 function MoreSection({ children, tabs }: { children: React.ReactNode; tabs: (JSX.Element | null)[] }) {
     return (
@@ -724,6 +746,19 @@ function getCustomLinkedTabs(pubkey: PublicKey, account: Account) {
         tab: programMultisigTab,
     });
 
+    // Add extensions tab for Token Extensions program accounts
+    if (account.owner.toBase58() === TOKEN_2022_PROGRAM_ADDRESS) {
+        const extensionsTab: Tab = {
+            path: 'token-extensions',
+            slug: 'token-extensions',
+            title: 'Extensions',
+        };
+        tabComponents.push({
+            component: <TokenExtensionsLink tab={extensionsTab} address={pubkey.toString()} />,
+            tab: extensionsTab,
+        });
+    }
+
     const anchorProgramTab: Tab = {
         path: 'anchor-program',
         slug: 'anchor-program',
@@ -869,6 +904,20 @@ function ProgramMultisigLink({
     return (
         <li key={tab.slug} className="nav-item">
             <Link className={`${isActive ? 'active ' : ''}nav-link`} href={tabPath}>
+                {tab.title}
+            </Link>
+        </li>
+    );
+}
+
+function TokenExtensionsLink({ address, tab }: { address: string; tab: Tab }) {
+    const accountDataPath = useClusterPath({ pathname: `/address/${address}/${tab.path}` });
+    const selectedLayoutSegment = useSelectedLayoutSegment();
+    const isActive = selectedLayoutSegment === tab.path;
+
+    return (
+        <li key={tab.slug} className="nav-item">
+            <Link className={`${isActive ? 'active ' : ''}nav-link`} href={accountDataPath}>
                 {tab.title}
             </Link>
         </li>
