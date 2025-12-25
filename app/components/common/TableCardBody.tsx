@@ -13,7 +13,9 @@ const tableVariants = cva(['table table-sm card-table'], {
     },
 });
 
-export interface TableCardBodyProps extends VariantProps<typeof tableVariants>, React.PropsWithChildren {}
+export interface TableCardBodyProps extends VariantProps<typeof tableVariants>, React.PropsWithChildren {
+    headerComponent?: React.ReactNode;
+}
 
 export function TableCardBody({ children, ...props }: TableCardBodyProps) {
     return (
@@ -23,10 +25,6 @@ export function TableCardBody({ children, ...props }: TableCardBodyProps) {
             </table>
         </div>
     );
-}
-
-export interface TableCardBodyProps extends VariantProps<typeof tableVariants>, React.PropsWithChildren {
-    headerComponent?: React.ReactNode;
 }
 
 export function TableCardBodyHeaded({ children, headerComponent, ...props }: TableCardBodyProps) {
