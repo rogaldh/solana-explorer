@@ -4,13 +4,19 @@ on:
   push:
   pull_request:
 
+env:
+  # cash folder for pnpm_store, nextjs and playwright later on
+  PW_CACHE_AFFIX: pw
+  PW_CACHE_FOLDER: ~/.cache/ms-playwright
+
 jobs:
   Build-And-Test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: ['20.x']
 
     steps:
       - name: Checkout
@@ -27,6 +33,21 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
+      - name: Setup pnpm config
+        run: pnpm config set store-dir $PNPM_CACHE_FOLDER
+
+      - name: Setup Cache
+        uses: actions/cache@v4
+        id: pnpm_store_cache
+        with:
+          path: |
+            ${{ env.PW_CACHE_FOLDER }}
+            ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-${{ env.PW_CACHE_AFFIX }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/.browserslistrc') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.PW_CACHE_AFFIX }}-
+            ${{ runner.os }}-${{ env.PW_CACHE_AFFIX }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
+
       - name: Install dependencies
         run: pnpm install
 
@@ -38,11 +59,11 @@ jobs:
           echo "$NEXT_PUBLIC_MAINNET_RPC_URL"
           pnpm build
 
+      - name: Code-style
+        run: pnpm format:ci
+
       - name: Test
         env:
-          NEXT_PUBLIC_MAINNET_RPC_URL: ${{ secrets.NEXT_PUBLIC_MAINNET_RPC_URL }}
-          NEXT_PUBLIC_DEVNET_RPC_URL: ${{ secrets.NEXT_PUBLIC_DEVNET_RPC_URL }}
+          TEST_SERIAL_TIMEOUT: ${{ vars.TEST_SERIAL_TIMEOUT }}
         run: |
-          echo "$NEXT_PUBLIC_MAINNET_RPC_URL"
-          echo "$NEXT_PUBLIC_DEVNET_RPC_URL"
           pnpm test:ci

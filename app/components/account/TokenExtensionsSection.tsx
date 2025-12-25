@@ -4,32 +4,38 @@ import { Code, ExternalLink } from 'react-feather';
 import ReactJson from 'react-json-view';
 
 import { TableCardBodyHeaded } from '@/app/components/common/TableCardBody';
-import { StatusBadge } from '@/app/components/shared/StatusBadge';
 import { Badge } from '@/app/components/shared/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/shared/ui/tooltip';
+import {
+    getAnchorId,
+    useTokenExtensionNavigation,
+} from '@/app/features/token-extensions/use-token-extension-navigation';
 import { TokenExtension } from '@/app/validators/accounts/token-extension';
 
+import { TokenExtensionBadge } from '../common/TokenExtensionBadge';
 import { TokenExtensionRow } from './TokenAccountSection';
 import { ParsedTokenExtension } from './types';
 
 export function TokenExtensionsSection({
+    address,
     decimals,
     extensions,
     parsedExtensions,
     symbol,
 }: {
+    address: string;
     decimals: number;
     extensions: TokenExtension[];
     parsedExtensions: ParsedTokenExtension[];
     symbol?: string;
 }) {
-    const [selectedExtension, setSelectedExtension] = useState<string | undefined>(undefined);
+    const { activeExtension: selectedExtension, setActiveExtension: setSelectedExtension } =
+        useTokenExtensionNavigation({ uriComponent: `/address/${address}` });
 
     const onSelect = useCallback(
         (id: string) => {
             setSelectedExtension(id === selectedExtension ? undefined : id);
         },
-        [selectedExtension]
+        [selectedExtension, setSelectedExtension]
     );
 
     // handle accordion item click to change the selected extension
@@ -51,7 +57,12 @@ export function TokenExtensionsSection({
                 });
 
                 return (
-                    <AccordionItem key={ext.extension} value={ext.extension} onClick={handleSelect}>
+                    <AccordionItem
+                        id={getAnchorId(ext)}
+                        key={ext.extension}
+                        value={ext.extension}
+                        onClick={handleSelect}
+                    >
                         {extension && (
                             <TokenExtensionAccordionItem
                                 decimals={decimals}
@@ -146,17 +157,7 @@ function ExtensionListItem({
             {/* Name */}
             <div className="e-flex e-min-w-80 e-items-center e-gap-2 e-whitespace-nowrap e-font-normal max-xs:e-col-span-6 xs:e-col-span-6 sm:e-col-span-6 md:e-col-span-4 lg:e-col-span-3">
                 <div>{ext.name}</div>
-                <Tooltip>
-                    {/* might be needed to wrap tooltip into a wrapper that watches window borders to adjust tootip's position */}
-                    <TooltipTrigger className="badge border-0 bg-transparent">
-                        <StatusBadge status={ext.status} label={ext.name} className="e-text-14" />
-                    </TooltipTrigger>
-                    {ext.tooltip && (
-                        <TooltipContent>
-                            <div className="e-min-w-36 e-max-w-16">{ext.tooltip}</div>
-                        </TooltipContent>
-                    )}
-                </Tooltip>
+                <TokenExtensionBadge extension={ext} />
             </div>
 
             {/* Description */}

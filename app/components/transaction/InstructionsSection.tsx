@@ -1,6 +1,6 @@
+import { parseInstruction } from '@codama/dynamic-parsers';
 import { ErrorCard } from '@components/common/ErrorCard';
 import { LoadingCard } from '@components/common/LoadingCard';
-import { isAddressLookupTableInstruction } from '@components/instruction/address-lookup-table/types';
 import { AddressLookupTableDetailsCard } from '@components/instruction/AddressLookupTableDetailsCard';
 import { AssociatedTokenDetailsCard } from '@components/instruction/associated-token/AssociatedTokenDetailsCard';
 import { BpfLoaderDetailsCard } from '@components/instruction/bpf-loader/BpfLoaderDetailsCard';
@@ -39,10 +39,15 @@ import {
 import { Cluster } from '@utils/cluster';
 import { INNER_INSTRUCTIONS_START_SLOT, SignatureProps } from '@utils/index';
 import { intoTransactionInstruction } from '@utils/tx';
+import { RootNode } from 'codama';
 import React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
+import { useCodamaIdl } from '@/app/providers/useCodamaIdl';
+
+import { upcastTransactionInstruction } from '../inspector/into-parsed-data';
 import AnchorDetailsCard from '../instruction/AnchorDetailsCard';
+import { CodamaInstructionCard } from '../instruction/codama/CodamaInstructionDetailsCard';
 import { Ed25519DetailsCard } from '../instruction/ed25519/Ed25519DetailsCard';
 import { isEd25519Instruction } from '../instruction/ed25519/types';
 import { LighthouseDetailsCard } from '../instruction/lighthouse/LighthouseDetailsCard';
@@ -167,6 +172,7 @@ function InstructionCard({
 }) {
     const key = `${index}-${childIndex}`;
     const { program: anchorProgram } = useAnchorProgram(ix.programId.toString(), url);
+    const { codamaIdl } = useCodamaIdl(ix.programId.toString(), url);
 
     if ('parsed' in ix) {
         const props = {
@@ -199,6 +205,8 @@ function InstructionCard({
                 return <AssociatedTokenDetailsCard {...props} key={key} />;
             case 'vote':
                 return <VoteDetailsCard {...props} key={key} />;
+            case 'address-lookup-table':
+                return <AddressLookupTableDetailsCard {...props} key={key} />;
             default:
                 return <UnknownDetailsCard {...props} key={key} />;
         }
@@ -219,9 +227,7 @@ function InstructionCard({
         signature,
     };
 
-    if (isAddressLookupTableInstruction(transactionIx)) {
-        return <AddressLookupTableDetailsCard key={key} {...props} />;
-    } else if (isEd25519Instruction(transactionIx)) {
+    if (isEd25519Instruction(transactionIx)) {
         return <Ed25519DetailsCard key={key} {...props} tx={tx} />;
     } else if (isMangoInstruction(transactionIx)) {
         return <MangoDetailsCard key={key} {...props} />;
@@ -239,6 +245,12 @@ function InstructionCard({
         return <ComputeBudgetDetailsCard key={key} {...props} />;
     } else if (isLighthouseInstruction(transactionIx)) {
         return <LighthouseDetailsCard key={key} {...props} />;
+    } else if (codamaIdl) {
+        const parsedIx = parseInstruction(codamaIdl as RootNode, upcastTransactionInstruction(transactionIx));
+        if (!parsedIx) {
+            return <UnknownDetailsCard key={key} {...props} />;
+        }
+        return <CodamaInstructionCard key={key} {...props} parsedIx={parsedIx} />;
     } else if (anchorProgram) {
         return (
             <ErrorBoundary fallback={<UnknownDetailsCard {...props} />} key={key}>

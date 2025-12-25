@@ -46,6 +46,7 @@ import useSWR from 'swr';
 
 import { FullLegacyTokenInfo, getTokenInfo, getTokenInfoSwrKey } from '@/app/utils/token-info';
 
+import { TokenExtensionsStatusRow } from './token-extensions/TokenExtensionsStatusRow';
 import { UnknownAccountCard } from './UnknownAccountCard';
 
 const getEthAddress = (link?: string) => {
@@ -287,6 +288,9 @@ function FungibleTokenMintAccountCard({
                             </td>
                         </tr>
                     )}
+                    {mintExtensions && (
+                        <TokenExtensionsStatusRow address={account.pubkey.toBase58()} extensions={mintExtensions} />
+                    )}
                 </TableCardBody>
             </div>
         </>
@@ -400,8 +404,7 @@ async function fetchTokenInfo([_, address, cluster, url]: ['get-token-info', str
 
 function TokenAccountCard({ account, info }: { account: Account; info: TokenAccountInfo }) {
     const refresh = useFetchAccountInfo();
-    const { cluster, clusterInfo, url } = useCluster();
-    const epoch = clusterInfo?.epochInfo.epoch;
+    const { cluster, url } = useCluster();
     const label = addressLabel(account.pubkey.toBase58(), cluster);
     const swrKey = useMemo(() => getTokenInfoSwrKey(info.mint.toString(), cluster, url), [cluster, info.mint, url]);
 
@@ -513,8 +516,8 @@ function TokenAccountCard({ account, info }: { account: Account; info: TokenAcco
                         </tr>
                     </>
                 )}
-                {accountExtensions?.map(extension =>
-                    TokenExtensionRow(extension, epoch, info.tokenAmount.decimals, symbol)
+                {accountExtensions && (
+                    <TokenExtensionsStatusRow address={account.pubkey.toBase58()} extensions={accountExtensions} />
                 )}
             </TableCardBody>
         </div>
@@ -604,7 +607,10 @@ function cmpExtension(a: TokenExtension, b: TokenExtension) {
 function HHeader({ name }: { name: string }) {
     return (
         <tr>
-            <h4>{name}</h4>
+            {/*use important here as there is rule from .table-sm that affects all the underline elements*/}
+            <th colSpan={2} className="e-mb-2 !e-p-4 e-text-[15px] e-font-normal">
+                {name}
+            </th>
         </tr>
     );
 }
@@ -654,7 +660,7 @@ export function TokenExtensionRow(
             const extension = create(tokenExtension.state, TransferFeeConfig);
             return (
                 <>
-                    {headerStyle == 'header' ? <HHeader name="Transfer Fee Config" /> : null}
+                    {headerStyle === 'header' ? <HHeader name="Transfer Fee Config" /> : null}
                     {extension.transferFeeConfigAuthority && (
                         <tr>
                             <td>Transfer Fee Authority</td>
@@ -981,7 +987,10 @@ export function TokenExtensionRow(
                     {extension.additionalMetadata?.length > 0 && (
                         <>
                             <tr>
-                                <h5>Additional Metadata</h5>
+                                {/*use important here as there is rule from .table-sm that affects all the underline elements*/}
+                                <th colSpan={2} className="e-mb-2 e-h-5 !e-pl-6 e-font-normal e-italic">
+                                    Additional Metadata
+                                </th>
                             </tr>
                             {extension.additionalMetadata?.map(keyValuePair => (
                                 <tr key="{keyValuePair[0]}">

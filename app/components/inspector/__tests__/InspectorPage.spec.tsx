@@ -1,10 +1,11 @@
 import { AccountInfo } from '@solana/web3.js';
 import { generated, PROGRAM_ID } from '@sqds/multisig';
 const { VaultTransaction } = generated;
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
+import { sleep } from '@/app/__tests__/mocks';
 import { AccountsProvider } from '@/app/providers/accounts';
 import { ClusterProvider } from '@/app/providers/cluster';
 import { ScrollAnchorProvider } from '@/app/providers/scroll-anchor';
@@ -69,6 +70,9 @@ describe('TransactionInspectorPage with Squads Transaction', () => {
     ];
 
     beforeEach(async () => {
+        // sleep to allow not facing 429s
+        await sleep();
+
         // Setup search params mock
         const mockUseSearchParamsReturn = mockUseSearchParams();
         vi.spyOn(await import('next/navigation'), 'useSearchParams').mockReturnValue(mockUseSearchParamsReturn as any);
@@ -106,7 +110,7 @@ describe('TransactionInspectorPage with Squads Transaction', () => {
             </ScrollAnchorProvider>
         );
 
-        await vi.waitFor(
+        await waitFor(
             () => {
                 expect(screen.queryByText(/Inspector Input/i)).toBeNull();
             },
@@ -173,9 +177,16 @@ describe('TransactionInspectorPage with Squads Transaction', () => {
             </ScrollAnchorProvider>
         );
 
-        await vi.waitFor(
+        await waitFor(
             () => {
                 expect(screen.queryByText(/Inspector Input/i)).toBeNull();
+            },
+            { interval: 50, timeout: 10000 }
+        );
+
+        await waitFor(
+            () => {
+                expect(screen.queryByText(/Loading/i)).toBeNull();
             },
             { interval: 50, timeout: 10000 }
         );
@@ -187,7 +198,7 @@ describe('TransactionInspectorPage with Squads Transaction', () => {
 
         expect(screen.getByText(/Account List \(11\)/i)).not.toBeNull();
         expect(
-            screen.getByText(/Unknown Program \(45AMNJMGuojexK1rEBHJSSVFDpTUcoHRcAUmRfLF8hrm\) Instruction/i)
+            screen.getByText(/Unknown Program \(8TqqugH88U3fDEWeKHqBSxZKeqoRrXkdpy3ciX5GAruK\) Instruction/i)
         ).not.toBeNull();
     });
 });
