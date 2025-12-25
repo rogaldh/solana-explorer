@@ -22,9 +22,9 @@ function handleRequestBasedErrors(error: Error | undefined) {
 }
 
 async function requestResource(
-    uri: string, 
-    headers: Headers, 
-    timeout: number, 
+    uri: string,
+    headers: Headers,
+    timeout: number,
     size: number
 ): Promise<[Error, void] | [void, fetch.Response]> {
     let response: fetch.Response | undefined;
@@ -58,11 +58,11 @@ export async function fetchResource(
     timeout: number,
     size: number
 ): Promise<Awaited<|
-    ReturnType<typeof processBinary> | 
+    ReturnType<typeof processBinary> |
     ReturnType<typeof processJson>
 >> {
     const [error, response] = await requestResource(uri, headers, timeout, size);
-    
+
     // check for response to infer proper type for it
     // and throw proper error
     if (error || !response) {
@@ -79,5 +79,5 @@ export async function fetchResource(
     if (isImage) return processBinary(response);
 
     // otherwise we throw error as we getting unexpected content
-    throw unsupportedMediaError
+    throw unsupportedMediaError;
 }

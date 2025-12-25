@@ -12,14 +12,14 @@ const privateIPv4CIDRs = [
     '169.254.0.0/16',
     '100.64.0.0/10',
     '0.0.0.0/8',
-]
+];
 
 const privateIPv6CIDRs = [
     '::1/128',
     'fc00::/7',
     'fe80::/10',
     '::ffff:0:0/96'
-]
+];
 
 /**
  *  Check if an IP is in a CIDR block
@@ -34,7 +34,7 @@ function ipInRange(ip: Address.IPv4 | Address.IPv6, cidr: string) {
  *  Check if an IP falls within a private range
  */
 export function isPrivateIP(ip: string) {
-    const isIPv4 = Address.IPv4.isIPv4(ip)
+    const isIPv4 = Address.IPv4.isIPv4(ip);
     const normalizedIP = parse(ip);
 
     let isMatchedRanges: boolean;
@@ -60,7 +60,7 @@ export function isLocalhost(url: URL) {
  */
 export async function checkURLForPrivateIP(uri: URL | string) {
     try {
-        let url: URL
+        let url: URL;
         if (uri instanceof URL) {
             url = uri;
         } else {
@@ -80,12 +80,21 @@ export async function checkURLForPrivateIP(uri: URL | string) {
         }
 
         // Resolve DNS and check against private IP ranges
-        const addresses = await dns.lookup(hostname, { all: true });
+        // Enrich type as there are cases when addresses are undefined which is against the original DNS's types
+        type LookupAddressResult = Awaited<ReturnType<typeof dns.lookup>>
+        const addresses: LookupAddressResult | LookupAddressResult[] | undefined = await dns.lookup(hostname, { all: true });
 
-        for (const address of addresses) {
-            if (isPrivateIP(address.address)) {
-                return true;
-          }
+        if (addresses === undefined) return true;
+
+        if (Array.isArray(addresses)) {
+            for (const address of addresses) {
+                if (isPrivateIP(address.address)) {
+                    return true;
+                }
+            }
+        } else {
+            const singleResult = addresses as unknown as LookupAddressResult;
+            return isPrivateIP(singleResult.address);
         }
 
         return false;

@@ -90,6 +90,7 @@ function HoldingsDetailTable({ tokens }: { tokens: TokenInfoWithPubkey[] }) {
                 {showLogos && (
                     <td className="w-1 p-0 text-center">
                         {tokenAccount.logoURI ? (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                                 alt="token icon"
                                 className="token-icon rounded-circle border border-4 border-gray-dark"
@@ -138,11 +139,11 @@ function HoldingsDetailTable({ tokens }: { tokens: TokenInfoWithPubkey[] }) {
 
 function HoldingsSummaryTable({ tokens }: { tokens: TokenInfoWithPubkey[] }) {
     type MappedToken = {
-        amount: string,
-        logoURI?: string,
-        symbol?: string,
-        name?: string
-    }
+        amount: string;
+        logoURI?: string;
+        symbol?: string;
+        name?: string;
+    };
     const mappedTokens = new Map<string, MappedToken>();
     for (const { info: token, logoURI, symbol, name } of tokens) {
         const mintAddress = token.mint.toBase58();
@@ -157,7 +158,7 @@ function HoldingsSummaryTable({ tokens }: { tokens: TokenInfoWithPubkey[] }) {
             amount,
             logoURI,
             name,
-            symbol
+            symbol,
         });
     }
 
@@ -169,6 +170,7 @@ function HoldingsSummaryTable({ tokens }: { tokens: TokenInfoWithPubkey[] }) {
                 {showLogos && (
                     <td className="w-1 p-0 text-center">
                         {token.logoURI ? (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                                 alt="token icon"
                                 className="token-icon rounded-circle border border-4 border-gray-dark"

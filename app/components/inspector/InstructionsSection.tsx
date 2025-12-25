@@ -1,179 +1,145 @@
-import { HexData } from '@components/common/HexData';
-import { TableCardBody } from '@components/common/TableCardBody';
+import { BaseInstructionCard } from '@components/common/BaseInstructionCard';
 import { useCluster } from '@providers/cluster';
-import { useScrollAnchor } from '@providers/scroll-anchor';
+import { ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
-    AccountMeta,
-    MessageCompiledInstruction,
-    PublicKey,
+    AddressLookupTableAccount,
+    ComputeBudgetProgram,
     TransactionInstruction,
+    TransactionMessage,
     VersionedMessage,
 } from '@solana/web3.js';
-import getInstructionCardScrollAnchorId from '@utils/get-instruction-card-scroll-anchor-id';
 import { getProgramName } from '@utils/tx';
 import React from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 
+import { useAddressLookupTables } from '@/app/providers/accounts';
 import { useAnchorProgram } from '@/app/providers/anchor';
+import { FetchStatus } from '@/app/providers/cache';
 
+import { ErrorCard } from '../common/ErrorCard';
+import { LoadingCard } from '../common/LoadingCard';
 import AnchorDetailsCard from '../instruction/AnchorDetailsCard';
-import { AddressFromLookupTableWithContext, AddressWithContext, programValidator } from './AddressWithContext';
+import { ComputeBudgetDetailsCard } from '../instruction/ComputeBudgetDetailsCard';
+import { AssociatedTokenDetailsCard } from './associated-token/AssociatedTokenDetailsCard';
+import { intoParsedInstruction } from './into-parsed-data';
+import { UnknownDetailsCard } from './UnknownDetailsCard';
 
 export function InstructionsSection({ message }: { message: VersionedMessage }) {
+    // Fetch all address lookup tables
+    const hydratedTables = useAddressLookupTables(
+        message.addressTableLookups.map(lookup => lookup.accountKey.toString())
+    );
+    for (let i = 0; i < hydratedTables.length; i++) {
+        const table = hydratedTables[i];
+        if (table && table[1] === FetchStatus.FetchFailed) {
+            return (
+                <ErrorCard
+                    text={`Failed to fetch address lookup table: ${message.addressTableLookups[
+                        i
+                    ].accountKey.toString()}`}
+                />
+            );
+        }
+    }
+
+    const allDefined = hydratedTables.every(
+        table => table !== undefined && table[0] instanceof AddressLookupTableAccount
+    );
+    if (!allDefined) {
+        return <LoadingCard />;
+    }
+
+    const addressLookupTableAccounts = (hydratedTables as any as Array<[AddressLookupTableAccount, FetchStatus]>).map(
+        table => table[0]
+    );
+    const transactionMessage = TransactionMessage.decompile(message, { addressLookupTableAccounts });
+
     return (
         <>
-            {message.compiledInstructions.map((ix, index) => {
-                return <InstructionCard key={index} {...{ index, ix, message }} />;
+            {transactionMessage.instructions.map((ix, index) => {
+                return <InspectorInstructionCard key={index} {...{ index, ix, message }} />;
             })}
         </>
     );
 }
 
-function InstructionCard({
+function InspectorInstructionCard({
     message,
     ix,
     index,
 }: {
     message: VersionedMessage;
-    ix: MessageCompiledInstruction;
+    ix: TransactionInstruction;
     index: number;
 }) {
-    const [expanded, setExpanded] = React.useState(false);
     const { cluster, url } = useCluster();
-    const programId = message.staticAccountKeys[ix.programIdIndex];
+
+    const programId = ix.programId;
     const programName = getProgramName(programId.toBase58(), cluster);
-    const scrollAnchorRef = useScrollAnchor(getInstructionCardScrollAnchorId([index + 1]));
-    const lookupsForAccountKeyIndex = [
-        ...message.addressTableLookups.flatMap(lookup =>
-            lookup.writableIndexes.map(index => ({
-                lookupTableIndex: index,
-                lookupTableKey: lookup.accountKey,
-            }))
-        ),
-        ...message.addressTableLookups.flatMap(lookup =>
-            lookup.readonlyIndexes.map(index => ({
-                lookupTableIndex: index,
-                lookupTableKey: lookup.accountKey,
-            }))
-        ),
-    ];
     const anchorProgram = useAnchorProgram(programId.toString(), url);
 
     if (anchorProgram.program) {
-        const accountMetas = ix.accountKeyIndexes.map((accountIndex, _index) => {
-            let lookup: PublicKey;
-            if (accountIndex >= message.staticAccountKeys.length) {
-                const lookupIndex = accountIndex - message.staticAccountKeys.length;
-                lookup = lookupsForAccountKeyIndex[lookupIndex].lookupTableKey;
-            } else {
-                lookup = message.staticAccountKeys[accountIndex];
-            }
-
-            const isSigner = accountIndex < message.header.numRequiredSignatures;
-            const isWritable = message.isAccountWritable(accountIndex);
-            const accountMeta: AccountMeta = {
-                isSigner,
-                isWritable,
-                pubkey: lookup,
-            };
-            return accountMeta;
-        });
-
-        const transactionInstruction: TransactionInstruction = new TransactionInstruction({
-            data: Buffer.from(message.compiledInstructions[index].data),
-            keys: accountMetas,
-            programId: programId,
-        });
-
-        return AnchorDetailsCard({
-            anchorProgram: anchorProgram.program,
-            childIndex: undefined,
-            index: index,
-            // Inner cards and child are not used since we do not know what CPIs
-            // will be called until simulation happens, and even then, all we
-            // get is logs, not the TransactionInstructions
-            innerCards: undefined,
-            ix: transactionInstruction,
-            // Always display success since it is too complicated to determine
-            // based on the simulation and pass that result here. Could be added
-            // later if desired, possibly similar to innerCards from parsing tx
-            // sim logs.
-            result: { err: null },
-            // Signature is not needed.
-            signature: '',
-        });
+        return (
+            <ErrorBoundary
+                fallback={<UnknownDetailsCard key={index} index={index} ix={ix} programName="Unknown Program" />}
+            >
+                <AnchorDetailsCard
+                    anchorProgram={anchorProgram.program}
+                    index={index}
+                    // Inner cards and child are not used since we do not know what CPIs
+                    // will be called until simulation happens, and even then, all we
+                    // get is logs, not the TransactionInstructions
+                    innerCards={undefined}
+                    ix={ix}
+                    // Always display success since it is too complicated to determine
+                    // based on the simulation and pass that result here. Could be added
+                    // later if desired, possibly similar to innerCards from parsing tx
+                    // sim logs.
+                    result={{ err: null }}
+                    // Signature is not needed.
+                    signature=""
+                />
+            </ErrorBoundary>
+        );
     }
 
-    return (
-        <div className="card" key={index} ref={scrollAnchorRef}>
-            <div className={`card-header${!expanded ? ' border-bottom-none' : ''}`}>
-                <h3 className="card-header-title mb-0 d-flex align-items-center">
-                    <span className={`badge bg-info-soft me-2`}>#{index + 1}</span>
-                    {programName} Instruction
-                </h3>
+    /// Handle program-specific cards here
+    //  - keep signature (empty string as we do not submit anything) for backward compatibility with the data from Transaction
+    //  - result is `err: null` as at this point there should not be errors
+    const result = { err: null };
+    const signature = '';
+    switch (ix.programId.toString()) {
+        case ASSOCIATED_TOKEN_PROGRAM_ID.toString(): {
+            // NOTE: current limitation is that innerInstructions won't be present at the AssociatedTokenDetailsCard. For that purpose we might need to simulateTransactions to get them.
 
-                <button
-                    className={`btn btn-sm d-flex ${expanded ? 'btn-black active' : 'btn-white'}`}
-                    onClick={() => setExpanded(e => !e)}
-                >
-                    {expanded ? 'Collapse' : 'Expand'}
-                </button>
-            </div>
-            {expanded && (
-                <TableCardBody>
-                    <tr>
-                        <td>Program</td>
-                        <td className="text-lg-end">
-                            <AddressWithContext
-                                pubkey={message.staticAccountKeys[ix.programIdIndex]}
-                                validator={programValidator}
-                            />
-                        </td>
-                    </tr>
-                    {ix.accountKeyIndexes.map((accountIndex, index) => {
-                        let lookup;
-                        if (accountIndex >= message.staticAccountKeys.length) {
-                            const lookupIndex = accountIndex - message.staticAccountKeys.length;
-                            lookup = lookupsForAccountKeyIndex[lookupIndex];
-                        }
+            const asParsedInstruction = intoParsedInstruction(ix);
+            return (
+                <AssociatedTokenDetailsCard
+                    key={index}
+                    ix={asParsedInstruction}
+                    raw={ix}
+                    message={message}
+                    index={index}
+                    result={result}
+                />
+            );
+        }
+        case ComputeBudgetProgram.programId.toString(): {
+            return (
+                <ComputeBudgetDetailsCard
+                    key={index}
+                    ix={ix}
+                    index={index}
+                    result={result}
+                    signature={signature}
+                    InstructionCardComponent={BaseInstructionCard}
+                />
+            );
+        }
+        default: {
+            // unknown program; allow to render the next card
+        }
+    }
 
-                        return (
-                            <tr key={index}>
-                                <td>
-                                    <div className="d-flex align-items-start flex-column">
-                                        Account #{index + 1}
-                                        <span className="mt-1">
-                                            {accountIndex < message.header.numRequiredSignatures && (
-                                                <span className="badge bg-info-soft me-2">Signer</span>
-                                            )}
-                                            {message.isAccountWritable(accountIndex) && (
-                                                <span className="badge bg-danger-soft me-2">Writable</span>
-                                            )}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="text-lg-end">
-                                    {lookup === undefined ? (
-                                        <AddressWithContext pubkey={message.staticAccountKeys[accountIndex]} />
-                                    ) : (
-                                        <AddressFromLookupTableWithContext
-                                            lookupTableKey={lookup.lookupTableKey}
-                                            lookupTableIndex={lookup.lookupTableIndex}
-                                        />
-                                    )}
-                                </td>
-                            </tr>
-                        );
-                    })}
-                    <tr>
-                        <td>
-                            Instruction Data <span className="text-muted">(Hex)</span>
-                        </td>
-                        <td className="text-lg-end">
-                            <HexData raw={Buffer.from(ix.data)} />
-                        </td>
-                    </tr>
-                </TableCardBody>
-            )}
-        </div>
-    );
+    return <UnknownDetailsCard key={index} index={index} ix={ix} programName={programName} />;
 }
