@@ -16,8 +16,10 @@ export type AddressPageMetadataProps = Readonly<{
 export default async function getReadableTitleFromAddress(props: AddressPageMetadataProps): Promise<string> {
     const {
         params: { address },
-        searchParams: { cluster: clusterParam, customUrl },
+        searchParams,
     } = props;
+    const clusterParam = searchParams?.cluster;
+    const customUrl = searchParams?.customUrl;
 
     let cluster: Cluster;
     switch (clusterParam) {

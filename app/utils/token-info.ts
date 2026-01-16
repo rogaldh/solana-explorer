@@ -100,7 +100,7 @@ export async function getTokenInfoWithoutOnChainFallback(
     }
 
     const fetchedData = (await response.json()) as UtlApiResponse;
-    return fetchedData.content[0];
+    return fetchedData.content?.[0];
 }
 
 async function getFullLegacyTokenInfoUsingCdn(
